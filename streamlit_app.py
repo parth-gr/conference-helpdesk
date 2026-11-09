@@ -56,9 +56,9 @@ if not tracks:
     )
     st.stop()
 
-interests = st.multiselect("1. What topics interest you?", tracks)
-free_text = st.text_input(
-    "Anything else? (free-text keywords)", placeholder="e.g. eBPF, service mesh, gitops"
+topic = st.text_input(
+    "1. What topic are you interested in?",
+    placeholder="e.g. eBPF, service mesh, AI inference, gitops",
 )
 level = st.radio(
     "2. What's your experience level?",
@@ -66,16 +66,16 @@ level = st.radio(
     index=1,
     horizontal=True,
 )
-day = st.selectbox("3. Any particular day?", ["any", *days])
+day = st.selectbox("3. Which day do you want to attend?", ["any", *days])
 
 if st.button("Recommend talks →", type="primary"):
     recs = recommend(
         RecommendRequest(
-            interests=interests, free_text=free_text, level=level, day=day, size=8
+            interests=[], free_text=topic, level=level, day=day, size=8
         )
     )
     if not recs:
-        st.warning("No matching talks. Try different interests or another day.")
+        st.warning("No matching talks. Try a different topic or another day.")
     else:
         st.subheader(f"Top {len(recs)} talks for you")
         for r in recs:
