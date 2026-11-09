@@ -12,5 +12,8 @@ python-dotenv>=1.0
 fastapi>=0.115
 uvicorn>=0.30
 
+# Streamlit UI (deployable on Streamlit Community Cloud)
+streamlit>=1.30
+
 # dev
 pytest>=8.0

@@ -3,86 +3,166 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Conference Helpdesk</title>
+<title>Conference Talk Recommender</title>
 <style>
-  :root { --bg:#0f1221; --panel:#171a2e; --accent:#5b8cff; --user:#2b3566; --bot:#20243d; --text:#e7e9f5; --muted:#9aa0c4; }
+  :root { --bg:#0f1221; --panel:#171a2e; --accent:#5b8cff; --chip:#20243d; --chipsel:#2b3566; --text:#e7e9f5; --muted:#9aa0c4; --card:#191d33; }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; }
-  header { padding:16px 20px; background:var(--panel); border-bottom:1px solid #262a47; }
-  header h1 { margin:0; font-size:18px; }
-  header p { margin:4px 0 0; font-size:12px; color:var(--muted); }
-  #chat { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:12px; max-width:820px; width:100%; margin:0 auto; }
-  .msg { padding:12px 14px; border-radius:12px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; max-width:85%; }
-  .user { background:var(--user); align-self:flex-end; border-bottom-right-radius:4px; }
-  .bot { background:var(--bot); align-self:flex-start; border-bottom-left-radius:4px; }
-  .bot.err { background:#3a1f26; color:#ffb4b4; }
-  .meta { font-size:11px; color:var(--muted); margin:2px 4px; }
-  .typing { color:var(--muted); font-style:italic; }
-  form { display:flex; gap:10px; padding:16px 20px; background:var(--panel); border-top:1px solid #262a47; max-width:820px; width:100%; margin:0 auto; }
-  input { flex:1; padding:12px 14px; border-radius:10px; border:1px solid #2d3256; background:#10132a; color:var(--text); font-size:15px; }
-  input:focus { outline:none; border-color:var(--accent); }
-  button { padding:12px 20px; border:none; border-radius:10px; background:var(--accent); color:#fff; font-size:15px; cursor:pointer; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  header { padding:20px; background:var(--panel); border-bottom:1px solid #262a47; text-align:center; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:6px 0 0; font-size:13px; color:var(--muted); }
+  main { max-width:760px; margin:0 auto; padding:24px 20px 48px; }
+  .step { background:var(--panel); border:1px solid #262a47; border-radius:14px; padding:20px; margin-bottom:18px; }
+  .step h2 { margin:0 0 4px; font-size:16px; }
+  .step .hint { margin:0 0 14px; font-size:12px; color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { padding:8px 14px; border-radius:999px; background:var(--chip); border:1px solid #2d3256; cursor:pointer; font-size:13px; user-select:none; }
+  .chip.sel { background:var(--chipsel); border-color:var(--accent); }
+  input[type=text], select { width:100%; margin-top:10px; padding:11px 13px; border-radius:10px; border:1px solid #2d3256; background:#10132a; color:var(--text); font-size:14px; }
+  input:focus, select:focus { outline:none; border-color:var(--accent); }
+  .actions { text-align:center; margin-top:4px; }
+  button { padding:12px 26px; border:none; border-radius:10px; background:var(--accent); color:#fff; font-size:15px; cursor:pointer; }
+  button.secondary { background:transparent; border:1px solid #2d3256; color:var(--muted); }
   button:disabled { opacity:.5; cursor:default; }
+  #results { margin-top:8px; }
+  .card { background:var(--card); border:1px solid #262a47; border-radius:12px; padding:16px; margin-bottom:12px; }
+  .card h3 { margin:0 0 6px; font-size:15px; }
+  .card h3 a { color:var(--text); text-decoration:none; }
+  .card h3 a:hover { color:var(--accent); }
+  .card .line { font-size:12px; color:var(--muted); margin:2px 0; }
+  .card .reason { font-size:12px; color:var(--accent); margin-top:8px; font-style:italic; }
+  .empty { color:var(--muted); text-align:center; padding:20px; }
 </style>
 </head>
 <body>
   <header>
-    <h1>Conference Helpdesk</h1>
-    <p>Ask about sessions, schedules, speakers, rooms and the venue — powered by Elastic Agent Builder.</p>
+    <h1>🎟️ Conference Talk Recommender</h1>
+    <p>Answer a few quick questions and we'll suggest talks for you.</p>
   </header>
-  <div id="chat">
-    <div class="bot msg">Hi! I'm the conference helpdesk. Ask me anything about the program — sessions, speakers, rooms, tracks, or the venue.</div>
-  </div>
-  <form id="form">
-    <input id="input" placeholder="e.g. What Kubernetes sessions are on day 1?" autocomplete="off" />
-    <button id="send" type="submit">Send</button>
-  </form>
-<script>
-  const chat = document.getElementById('chat');
-  const form = document.getElementById('form');
-  const input = document.getElementById('input');
-  const send = document.getElementById('send');
-  let conversationId = null;
+  <main>
+    <div class="step">
+      <h2>1. What are you interested in?</h2>
+      <p class="hint">Pick any that apply. You can also type anything else below.</p>
+      <div class="chips" id="tracks"></div>
+      <input type="text" id="freeText" placeholder="e.g. kubernetes security, eBPF, service mesh" />
+    </div>
 
-  function add(text, cls) {
-    const div = document.createElement('div');
-    div.className = 'msg ' + cls;
-    div.textContent = text;
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
-    return div;
+    <div class="step">
+      <h2>2. What's your experience level?</h2>
+      <p class="hint">We'll nudge results toward talks that fit.</p>
+      <div class="chips" id="levels">
+        <div class="chip" data-level="beginner">Beginner</div>
+        <div class="chip sel" data-level="intermediate">Intermediate</div>
+        <div class="chip" data-level="advanced">Advanced</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2>3. Any particular day?</h2>
+      <p class="hint">Optional.</p>
+      <select id="day"><option value="any">Any day</option></select>
+    </div>
+
+    <div class="actions">
+      <button id="go">Recommend talks →</button>
+    </div>
+
+    <div id="results"></div>
+  </main>
+<script>
+  const tracksEl = document.getElementById('tracks');
+  const levelsEl = document.getElementById('levels');
+  const dayEl = document.getElementById('day');
+  const freeText = document.getElementById('freeText');
+  const go = document.getElementById('go');
+  const results = document.getElementById('results');
+  let level = 'intermediate';
+
+  async function loadOptions() {
+    try {
+      const res = await fetch('/api/options');
+      const data = await res.json();
+      (data.tracks || []).forEach(t => {
+        const c = document.createElement('div');
+        c.className = 'chip'; c.textContent = t; c.dataset.track = t;
+        c.addEventListener('click', () => c.classList.toggle('sel'));
+        tracksEl.appendChild(c);
+      });
+      (data.days || []).forEach(d => {
+        const o = document.createElement('option'); o.value = d; o.textContent = d;
+        dayEl.appendChild(o);
+      });
+      if (!(data.tracks || []).length) {
+        tracksEl.innerHTML = '<span class="hint">No indexed sessions yet — run the crawler first.</span>';
+      }
+    } catch (e) {
+      tracksEl.innerHTML = '<span class="hint">Could not load options: ' + e + '</span>';
+    }
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const message = input.value.trim();
-    if (!message) return;
-    add(message, 'user');
-    input.value = '';
-    send.disabled = true;
-    const typing = add('Thinking…', 'bot typing');
+  levelsEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    [...levelsEl.children].forEach(c => c.classList.remove('sel'));
+    chip.classList.add('sel');
+    level = chip.dataset.level;
+  });
+
+  function selectedTracks() {
+    return [...tracksEl.querySelectorAll('.chip.sel')].map(c => c.dataset.track);
+  }
+
+  function fmtTime(s) {
+    if (!s) return '';
+    try { return new Date(s).toLocaleString([], { weekday:'short', hour:'2-digit', minute:'2-digit' }); }
+    catch { return s; }
+  }
+
+  function render(recs) {
+    results.innerHTML = '';
+    if (!recs.length) {
+      results.innerHTML = '<div class="empty">No matching talks. Try different interests or a different day.</div>';
+      return;
+    }
+    recs.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const title = r.url ? `<a href="${r.url}" target="_blank" rel="noopener">${r.title}</a>` : r.title;
+      const when = [r.day, fmtTime(r.start_time)].filter(Boolean).join(' · ');
+      card.innerHTML =
+        `<h3>${title}</h3>` +
+        (r.speakers && r.speakers.length ? `<div class="line">👤 ${r.speakers.join(', ')}</div>` : '') +
+        `<div class="line">${[r.track, r.room, when].filter(Boolean).join(' · ')}</div>` +
+        `<div class="reason">${r.reason}</div>`;
+      results.appendChild(card);
+    });
+  }
+
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    results.innerHTML = '<div class="empty">Finding talks…</div>';
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, conversation_id: conversationId })
+        body: JSON.stringify({
+          interests: selectedTracks(),
+          free_text: freeText.value.trim(),
+          level,
+          day: dayEl.value,
+          size: 8
+        })
       });
       const data = await res.json();
-      typing.remove();
-      if (data.error) {
-        add(data.error, 'bot err');
-      } else {
-        conversationId = data.conversation_id || conversationId;
-        add(data.reply || '(no response)', 'bot');
-      }
-    } catch (err) {
-      typing.remove();
-      add('Request failed: ' + err, 'bot err');
+      render(data.recommendations || []);
+    } catch (e) {
+      results.innerHTML = '<div class="empty">Request failed: ' + e + '</div>';
     } finally {
-      send.disabled = false;
-      input.focus();
+      go.disabled = false;
     }
   });
+
+  loadOptions();
 </script>
 </body>
 </html>

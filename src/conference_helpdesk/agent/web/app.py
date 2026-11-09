@@ -1,8 +1,7 @@
-"""FastAPI web app for the Conference Helpdesk (System 2).
+"""FastAPI web app for the Conference Talk Recommender.
 
-Serves a browser chat UI and proxies messages to Elastic Agent Builder's
-Converse API. The Elastic API key stays on the server and is never exposed to
-the browser.
+Serves a short guided form (a few questions) and returns ranked talk
+recommendations straight from Elasticsearch -- no LLM, no chat.
 """
 from __future__ import annotations
 
@@ -13,34 +12,43 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..elastic_agent import ConverseClient, ElasticAgentError
+from ...recommend import (
+    RecommendRequest,
+    available_days,
+    available_tracks,
+    recommend,
+)
 
 _STATIC = Path(__file__).parent / "static"
 
-app = FastAPI(title="Conference Helpdesk")
+app = FastAPI(title="Conference Talk Recommender")
 
 
-class ChatRequest(BaseModel):
-    message: str
-    conversation_id: str | None = None
+class RecommendBody(BaseModel):
+    interests: list[str] = []
+    free_text: str = ""
+    level: str = "intermediate"
+    day: str = ""
+    size: int = 8
 
 
-class ChatResponse(BaseModel):
-    reply: str
-    conversation_id: str | None = None
-    error: str | None = None
+@app.get("/api/options")
+def options() -> dict:
+    """Values to populate the form (tracks and days actually in the index)."""
+    return {"tracks": available_tracks(), "days": available_days()}
 
 
-@app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
-    try:
-        client = ConverseClient()
-        result = client.converse(req.message, conversation_id=req.conversation_id)
-        return ChatResponse(
-            reply=result["reply"], conversation_id=result["conversation_id"]
-        )
-    except ElasticAgentError as exc:
-        return ChatResponse(reply="", error=str(exc))
+@app.post("/api/recommend")
+def recommend_endpoint(body: RecommendBody) -> dict:
+    req = RecommendRequest(
+        interests=body.interests,
+        free_text=body.free_text,
+        level=body.level,
+        day=body.day,
+        size=body.size,
+    )
+    recs = recommend(req)
+    return {"count": len(recs), "recommendations": [r.to_dict() for r in recs]}
 
 
 @app.get("/")
