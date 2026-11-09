@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual env
+.venv/
+venv/
+
+# Secrets / local config
+.env
+
+# Crawler HTML cache
+.cache/
+
+# Scratch / artifacts
+.cache_test.html
