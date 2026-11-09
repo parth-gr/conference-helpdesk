@@ -14,3 +14,31 @@ Answer attendee questions and generate summaries.
 <img width="1166" height="1552" alt="mermaid-diagram (2)" src="https://github.com/user-attachments/assets/4fb679df-f307-483c-b850-571e5ed0cb8c" />
 
 Purpose: Allow attendees to ask questions in natural language, receive answers based on indexed conference information, and get a summary of their conversation at the end.
+
+# Usage
+
+The two systems are independent subpackages:
+
+- `conference_helpdesk.crawler` — System 1: scrape sources, index into Elasticsearch.
+- `conference_helpdesk.agent` — System 2: web helpdesk backed by Elastic Agent Builder.
+
+```bash
+# 1. Install deps
+pip install -r requirements.txt
+
+# 2. Configure
+cp .env.example .env
+#   set ES_URL + ES_API_KEY (your Elasticsearch cluster)
+#   set KIBANA_URL           (the Kibana endpoint of the same cluster)
+
+# 3. Crawl + index conference data (System 1)
+PYTHONPATH=src python -m conference_helpdesk.crawler ingest
+PYTHONPATH=src python -m conference_helpdesk.crawler stats
+
+# 4. Run the web helpdesk (System 2)
+PYTHONPATH=src python -m conference_helpdesk.agent serve   # http://127.0.0.1:8000
+```
+
+The helpdesk's LLM is handled entirely by **Elastic Agent Builder** (its Converse
+API), so no Anthropic/OpenAI key is required — the agent reuses `ES_API_KEY` and
+searches the indexed conference data to ground its answers.
